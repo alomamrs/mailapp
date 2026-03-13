@@ -1,0 +1,125 @@
+# ── Mail App — Hardened .htaccess ────────────────────────────────
+
+# Disable directory listings
+Options -Indexes -MultiViews
+
+DirectoryIndex index.php
+
+# ── Security headers ─────────────────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "DENY"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://openrouter.ai; img-src 'self' data: https:; frame-ancestors 'none'; form-action 'self';"
+    # Remove server fingerprinting
+    Header always unset X-Powered-By
+    Header always unset Server
+</IfModule>
+
+# ── Block ALL direct access to sensitive files ────────────────────
+<FilesMatch "\.(json|db|sqlite|sql|log|lock|bak|env|ini|sh|key|pem|cfg)$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>
+
+# Block PHP files that should never be called directly from browser
+<FilesMatch "^(Auth|Portal|Security|Storage|UserTokens|Graph|Mailer|SearchParser)\.php$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>
+
+# Block diagnostic / test files (delete these from server!)
+<FilesMatch "^(diag|diag2|diag3|fwdtest|smtptest|phpinfo)\.php$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>
+
+# Block source-reveal extensions
+<FilesMatch "\.(bak|orig|old|copy|tmp|swp|~)$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>
+
+# ── Protect auth/ and data/ subdirectories ────────────────────────
+# (belt-and-suspenders — each has its own .htaccess too)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block direct access to auth/*.php (only includeable, not callable)
+    RewriteRule ^auth/.*\.php$ - [F,L]
+
+    # Block any request trying to read .json files directly
+    RewriteRule ^data/ - [F,L]
+
+    # Prevent source download tricks like index.php~ or index.php.bak
+    RewriteRule \.(bak|orig|old|copy|tmp)$ - [F,L]
+</IfModule>
+
+# ── Disable PHP error output to browser ──────────────────────────
+<IfModule mod_php7.c>
+    php_flag display_errors Off
+    php_flag display_startup_errors Off
+    php_flag log_errors On
+    php_value error_reporting 32767
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag display_errors Off
+    php_flag display_startup_errors Off
+    php_flag log_errors On
+    php_value error_reporting 32767
+</IfModule>
+
+# ── Block common attack patterns in URL ──────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteCond %{QUERY_STRING} (union|select|insert|drop|update|delete|script|alert|eval|base64_decode|passthru|exec|system|popen|proc_open) [NC]
+    RewriteRule ^ - [F,L]
+
+    # Block null bytes
+    RewriteCond %{QUERY_STRING} (%00|%0d%0a) [NC]
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# ── Allow normal files ────────────────────────────────────────────
+<FilesMatch "\.php$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+<FilesMatch "\.(css|js)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+<FilesMatch "\.html$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# ── Block original (unminified) source files ─────────────────────
+<FilesMatch "^(app\.js|style\.css)$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>
+
+# ── Block PHP source exposure tricks ─────────────────────────────
+# Deny requests with ?source, ?view-source, or common scraper headers
+<IfModule mod_rewrite.c>
+    RewriteCond %{QUERY_STRING} (source|view-source|show_source|highlight_file) [NC]
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# ── Disable ETags (prevent fingerprinting) ───────────────────────
+<IfModule mod_headers.c>
+    Header unset ETag
+</IfModule>
+FileETag None
+
+# ── Prevent MIME sniffing on JS/CSS ──────────────────────────────
+<FilesMatch "\.(min\.js|min\.css)$">
+    <IfModule mod_headers.c>
+        Header set X-Content-Type-Options "nosniff"
+        Header set Cache-Control "public, max-age=604800, immutable"
+    </IfModule>
+</FilesMatch>
