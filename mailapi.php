@@ -50,7 +50,7 @@ if (!Portal::isAuthed()) {
 Security::sendHeaders(true);
 
 // CSRF: verify on state-changing actions
-$_safeReads = ['emails','email','attachments','attachment_content','download_attachment','accounts','folders','folder_messages','calendar','free_busy','get_or_create_invite_code','update_invite_bg','regenerate_invite_code','extract_emails'];
+$_safeReads = ['emails','email','attachments','attachment_content','download_attachment','accounts','folders','folder_messages','calendar','free_busy','get_or_create_invite_code','update_invite_bg','regenerate_invite_code','extract_emails','status','device_code','poll','folders_simple','get_inbox_rules','me'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' || !in_array($_GET['action'] ?? '', $_safeReads, true)) {
     Security::verifyCsrf();
 }
